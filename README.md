@@ -50,40 +50,128 @@ STEP-5: Display the obtained cipher text.
 #include <stdio.h>
 #include <string.h>
 #include <ctype.h>
-void main()
+#define MX 5
 
-{
-    char plain[10],cipher[10];
-    int key,i,length;
-    int result;
-    printf("\n Enter the plain text:");
-    scanf("%s", plain);
-    printf("\n Enter the key value:");
-    scanf("%d", &key);
-    printf("\n \n \t PLAIN TEXt: %s", plain);
-    printf("\n \n \t ENCRYPTED TEXT:");
-    for(i=0, length = strlen(plain); i<length; i++)
-    {
-        
-        cipher[i]=plain[i] + key;
-        if (isupper(plain[i]) && (cipher[i] > 'Z'))
-        cipher[i] = cipher[i] - 26;
-        if (islower(plain[i]) && (cipher[i] > 'z'))
-        cipher[i] = cipher[i] - 26;
-        printf("%c", cipher[i]);
+// Function to prepare plaintext (removes spaces, replaces 'J' with 'I', etc.)
+void prepareText(char str[]) {
+    int len = strlen(str);
+    int i, j = 0;
+    // Convert to uppercase and replace 'J' with 'I'
+    for (i = 0; i < len; i++) {
+        if (str[i] == 'j' || str[i] == 'J') {
+            str[j++] = 'I';  // Replace 'J' with 'I'
+        } else if (isalpha(str[i])) {
+            str[j++] = toupper(str[i]);  // Convert to uppercase
+        }
+    }
+    str[j] = '\0';  // Null-terminate the string
+    // If the length is odd, append an 'X' to make it even
+    if (j % 2 != 0) {
+        str[j++] = 'X';
+    }
+    str[j] = '\0';
+}
 
+// Function to generate the Playfair cipher key table
+void generateKeyTable(char key[], char keyTable[MX][MX]) {
+    int i, j, k = 0;
+    int used[26] = {0};  // To mark already used letters in the key
+    // Add the key to the table
+    for (i = 0; i < strlen(key); i++) {
+        if (!used[key[i] - 'A']) {  // If the letter is not already used
+            keyTable[k / MX][k % MX] = key[i];
+            used[key[i] - 'A'] = 1;
+            k++;
+        }
     }
-    printf("\n \n \t AFTER DECRYPTION : ");
-    for(i=0;i<length;i++)
-    {
-        
-        plain[i]=cipher[i]-key;
-        if(isupper(cipher[i])&&(plain[i]<'A'))
-        plain[i]=plain[i]+26;
-        if(islower(cipher[i])&&(plain[i]<'a'))
-        plain[i]=plain[i]+26;
-        printf("%c",plain[i]);
+    // Fill the remaining spaces in the table with unused letters
+    for (i = 0; i < 26; i++) {
+        if (!used[i] && i != ('J' - 'A')) {  // Skip 'J'
+            keyTable[k / MX][k % MX] = 'A' + i;
+            k++;
+        }
     }
+}
+
+// Function to find the position of a character in the key table
+void findPosition(char keyTable[MX][MX], char ch, int *row, int *col) {
+    for (int i = 0; i < MX; i++) {
+        for (int j = 0; j < MX; j++) {
+            if (keyTable[i][j] == ch) {
+                *row = i;
+                *col = j;
+                return;
+            }
+        }
+    }
+}
+
+// Function to perform encryption with the Playfair cipher
+void playfair(char str[], char keyTable[MX][MX]) {
+    int i;
+    int row1, col1, row2, col2;
+
+    FILE *out = fopen("cipher.txt", "w");  // Open the output file
+    if (out == NULL) {
+        printf("Error opening file.\n");
+        return;
+    }
+
+    for (i = 0; i < strlen(str); i += 2) {
+        findPosition(keyTable, str[i], &row1, &col1);
+        findPosition(keyTable, str[i + 1], &row2, &col2);
+
+        // If both characters are in the same row
+        if (row1 == row2) {
+            printf("%c%c", keyTable[row1][(col1 + 1) % MX], keyTable[row2][(col2 + 1) % MX]);
+            fprintf(out, "%c%c", keyTable[row1][(col1 + 1) % MX], keyTable[row2][(col2 + 1) % MX]);
+        }
+        // If both characters are in the same column
+        else if (col1 == col2) {
+            printf("%c%c", keyTable[(row1 + 1) % MX][col1], keyTable[(row2 + 1) % MX][col2]);
+            fprintf(out, "%c%c", keyTable[(row1 + 1) % MX][col1], keyTable[(row2 + 1) % MX][col2]);
+        }
+        // If neither, form a rectangle
+        else {
+            printf("%c%c", keyTable[row1][col2], keyTable[row2][col1]);
+            fprintf(out, "%c%c", keyTable[row1][col2], keyTable[row2][col1]);
+        }
+    }
+    fclose(out);  // Close the output file
+}
+
+int main() {
+    char key[25], str[25], keyTable[MX][MX];
+
+    printf("Enter key: ");
+    fgets(key, sizeof(key), stdin);
+    key[strcspn(key, "\n")] = '\0';  // Remove trailing newline character
+
+    printf("Enter the plain text: ");
+    fgets(str, sizeof(str), stdin);
+    str[strcspn(str, "\n")] = '\0';  // Remove trailing newline character
+
+    // Prepare the key and plaintext
+    prepareText(key);
+    prepareText(str);
+
+    // Generate the Playfair cipher key table
+    generateKeyTable(key, keyTable);
+
+    // Display the generated key table
+    printf("\nGenerated Key Table:\n");
+    for (int i = 0; i < MX; i++) {
+        for (int j = 0; j < MX; j++) {
+            printf("%c ", keyTable[i][j]);
+        }
+        printf("\n");
+    }
+
+    printf("\nCipher Text: ");
+    // Perform encryption
+    playfair(str, keyTable);
+
+    return 0;
 }
 ```
 
@@ -92,7 +180,8 @@ void main()
 
 # OUTPUT:
 
-![image](https://github.com/user-attachments/assets/9eeffa8f-5200-496f-b19b-2fc348566eff)
+
+<img width="576" alt="c2" src="https://github.com/user-attachments/assets/a4a4a140-f92a-447c-8467-986036b5e094" />
 
 
 ## RESULT:
